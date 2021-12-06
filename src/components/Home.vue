@@ -144,17 +144,34 @@ export default {
 	  existTiker:false
     };
   },
+
+  created(){
+	const tickersData = localStorage.getItem('cryptonomicon-list');
+	console.log(tickersData);
+    if(tickersData){
+		this.tikers =  JSON.parse(tickersData);
+		this.tikers.forEach(ticker => {
+			this.subscribeToUpdates(ticker.name)
+		});
+		
+	}
+	  
+  },
+
+  async beforeMount() {
+	const response =  await fetch('https://min-api.cryptocompare.com/data/all/coinlist?summary=true')
+	const data = await response.json()
+	this.responseFetchData=(data.Data)
+	this.responseFetchData=Object.values(this.responseFetchData);
+  },
+
+
    computed: {
     tikersData() {	
-      return this.responseFetchData.filter(item => item.Symbol.indexOf(this.tiker.toUpperCase()) !== -1)
+      return this.responseFetchData.filter(item => item.Symbol.includes(this.tiker.toUpperCase()))
     },
   },
- async beforeMount() {
-  const response =  await fetch('https://min-api.cryptocompare.com/data/all/coinlist?summary=true')
-  const data = await response.json()
-  this.responseFetchData=(data.Data)
-  this.responseFetchData=Object.values(this.responseFetchData);
-  },
+  
   methods:{
 	   add(symbol){
 		  const newTiker = {
@@ -166,27 +183,30 @@ export default {
 		}else{
 			this.existTiker = false
 			this.tikers.push(newTiker)	
+			localStorage.setItem('cryptonomicon-list',JSON.stringify(this.tikers))
 		}
-
-			
-		  setInterval(async()=>{
- 		  	const f = await fetch(`https://min-api.cryptocompare.com/data/price?fsym=${newTiker.name}&tsyms=USD&api_key=428cb0fed2ba2c363acad304263d5cdceb6054737a8846b11d384da72c887a7c`)
- 		  	const data = await f.json()
-
-			this.tikers.find(t=>t.name === newTiker.name).price = data.USD
-
-			if(this.sel?.name === newTiker.name){
-				this.graph.push(data.USD)
-			}
-		  },3000)
-		 
-		 
-		  this.tiker = ''
+		this.subscribeToUpdates(newTiker.name)
 	  },
+
+	  subscribeToUpdates(tickerName){
+			setInterval(async()=>{
+				const f = await fetch(`https://min-api.cryptocompare.com/data/price?fsym=${tickerName}&tsyms=USD&api_key=428cb0fed2ba2c363acad304263d5cdceb6054737a8846b11d384da72c887a7c`)
+				const data = await f.json()
+
+				this.tikers.find(t=>t.name === tickerName).price = data.USD
+
+				if(this.sel?.name === tickerName){
+					this.graph.push(data.USD)
+				}
+			},3000)
+			this.tiker = ''
+	  },
+
 	  selectTicker(t){
 		  this.sel = t
 		  this.graph = []
 	  },
+
 	  normalizeGraph(){
 		const maxValue = Math.max(...this.graph)
 		const minValue = Math.min(...this.graph)
@@ -194,8 +214,11 @@ export default {
 			price=>2+((price-minValue)*98)/(maxValue-minValue)
 		)
 	  },
+
 	  remove(removeTiker){
 		this.tikers =  this.tikers.filter(t=>t!=removeTiker)
+		
+		// localStorage.removeItem('cryptonomicon-list',removeTiker);
 	  }
   }
 };
