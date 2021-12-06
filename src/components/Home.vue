@@ -52,9 +52,25 @@
 
       <hr v-if="tikers.length>0" class="w-full border-t border-gray-600 my-4" />
 
+		<div>Фильтрация:
+		<input v-model="filter" type="text"> 
+		<button
+		@click="page-=1"
+		:disabled="page===1"
+		class="my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+		>Назад</button>
+		<button
+		@click="page+=1"
+		:disabled="nextPageDisabled"
+		class="my-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+		>Далее</button>
+		
+		
+		</div>
+
       <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3" >
         <div class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer" 
-		v-for="t,inx in tikers" :key="inx"
+		v-for="t,inx in filteredList()" :key="inx"
 		@click="sel=t"
 		:class="{
 			'border-4':sel===t
@@ -141,13 +157,24 @@ export default {
 	  sel:null,
 	  graph:[],
 	  responseFetchData: [],
-	  existTiker:false
+	  existTiker:false,
+	  page:1,
+	  nextPageDisabled:true,
+	  filter:''
     };
   },
 
   created(){
+	const windowData = Object.fromEntries(new URL(window.location).searchParams.entries())
 	const tickersData = localStorage.getItem('cryptonomicon-list');
-	console.log(tickersData);
+
+	if(windowData.filter){
+		this.filter = windowData.filter
+	}
+	if(windowData.page){
+		this.page = windowData.page
+	}
+	
     if(tickersData){
 		this.tikers =  JSON.parse(tickersData);
 		this.tikers.forEach(ticker => {
@@ -168,11 +195,20 @@ export default {
 
    computed: {
     tikersData() {	
-      return this.responseFetchData.filter(item => item.Symbol.includes(this.tiker.toUpperCase()))
+      return this.responseFetchData.filter(item => item.Symbol.includes(this.tiker.toUpperCase()));
     },
   },
   
   methods:{
+	  filteredList(){
+		const start = (this.page -1)*6;
+		const end = (this.page)*6;
+		const filteredTic = this.tikers.filter(ticker=>ticker.name.includes(this.filter.toUpperCase()))
+		this.nextPageDisabled = filteredTic.length<end;
+
+		return filteredTic.slice(start,end);
+	  },
+
 	   add(symbol){
 		  const newTiker = {
 			  name:symbol.toUpperCase(),
@@ -184,8 +220,10 @@ export default {
 			this.existTiker = false
 			this.tikers.push(newTiker)	
 			localStorage.setItem('cryptonomicon-list',JSON.stringify(this.tikers))
+			this.filter = ''
 		}
 		this.subscribeToUpdates(newTiker.name)
+		
 	  },
 
 	  subscribeToUpdates(tickerName){
@@ -219,6 +257,15 @@ export default {
 		this.tikers =  this.tikers.filter(t=>t!=removeTiker)
 		
 		// localStorage.removeItem('cryptonomicon-list',removeTiker);
+	  }
+  },
+  watch:{
+	  filter(){
+		  this.page=1;
+		  window.history.pushState(null,document.title,`${window.location.pathname}?filter=${this.filter}&page=${this.page}`)
+	  },
+	  page(){
+		  window.history.pushState(null,document.title,`${window.location.pathname}?filter=${this.filter}&page=${this.page}`)
 	  }
   }
 };
